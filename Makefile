@@ -5,7 +5,7 @@ SIMULATOR := $(SDK_HOME)/bin/connectiq
 DEV_KEY := $(HOME)/.Garmin/developer_key
 
 DEVICE ?= edge540
-OUT := bin/RowEdge.prg
+OUT := bin/RemoEdge.prg
 JUNGLE := monkey.jungle
 
 # Font generation from RobotoCondensed-Bold
@@ -22,7 +22,7 @@ ifeq ($(GARMIN_MNT),)
 GARMIN_MNT := $(wildcard /run/media/$(USER)/GARMIN)
 endif
 
-.PHONY: build export fonts run_simulator simulator deploy clean
+.PHONY: build export export-beta fonts run_simulator simulator deploy clean
 
 build: $(OUT)
 
@@ -33,8 +33,14 @@ $(OUT): $(SOURCES) $(RESOURCES) $(JUNGLE) manifest.xml
 # Export multi-device .iq package (for Connect IQ Store upload)
 export: $(SOURCES) $(RESOURCES) $(JUNGLE) manifest.xml
 	@mkdir -p bin
-	$(MONKEYC) -e -f $(JUNGLE) -o bin/RowEdge.iq -y $(DEV_KEY)
-	@echo "Exported bin/RowEdge.iq (all devices)"
+	$(MONKEYC) -e -f $(JUNGLE) -o bin/RemoEdge.iq -y $(DEV_KEY)
+	@echo "Exported bin/RemoEdge.iq (all devices)"
+
+# Beta package: alternate app id, upload with "Beta App" checked
+export-beta: $(SOURCES) $(RESOURCES) monkey-beta.jungle manifest-beta.xml
+	@mkdir -p bin
+	$(MONKEYC) -e -f monkey-beta.jungle -o bin/RemoEdge-beta.iq -y $(DEV_KEY)
+	@echo "Exported bin/RemoEdge-beta.iq (all devices, beta app id)"
 
 fonts:
 	@echo "=== Edge 540/840 (246x322) ==="

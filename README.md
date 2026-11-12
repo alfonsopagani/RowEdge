@@ -1,13 +1,30 @@
-# RowEdge - Outdoor Rowing App for Garmin Edge
+# RemoEdge - Outdoor Rowing App for Garmin Edge
 
 <p align="center">
-  <img src="images/RoundBage.png" width="200" alt="RowEdge Logo"/>
+  <img src="images/RoundBage.png" width="200" alt="RemoEdge Logo"/>
 </p>
-
-[**Install from Connect IQ Store**](https://apps.garmin.com/apps/9064c795-03e1-4424-aa4e-e5033e03dbcf)
 
 An open-source Connect IQ app that turns Garmin Edge cycling computers into
 outdoor rowing performance computers.
+
+RemoEdge is a fork of [RowEdge](https://github.com/dmonakhov/RowEdge) by
+dmonakhov ([original app on the Connect IQ Store](https://apps.garmin.com/apps/9064c795-03e1-4424-aa4e-e5033e03dbcf)),
+distributed under the same GPLv3 license. Source of this fork:
+<https://github.com/alfonsopagani/RowEdge>.
+
+Changes from RowEdge v0.7:
+
+- Garmin Connect charts and activity summary for the rowing data, with
+  English and Italian labels (see [Garmin Connect](#garmin-connect))
+- Stroke timing fixed: per-sample stroke timestamps, raw sensor rate reduced to
+  the 25 Hz the stroke curve and metrics assume, stroke rate back from the
+  second stroke after a pause
+- Dark mode, Speed field in km/h
+- New home screen, launcher icon and badge in blue and gold
+  (`tools/gen_artwork.py` redraws them)
+
+The rest of this document describes the app; where it says RowEdge it applies
+to RemoEdge as well.
 
 ## Screenshots
 
