@@ -32,6 +32,7 @@ class RowingSession {
     // High-frequency forward accel: 25 samples/sec packed as 13 SINT32 fields
     // Each SINT32 = 2x sint16 packed: low=sample[2k], high=sample[2k+1]
     var hfreqFields = null; // array of 13 FitField, or null if disabled
+    var hfreqSeqField = null; // sequence number of the first sample in the record
     // Rowing metrics log (per-stroke values, written each second)
     var rmForceRatio = null;
     var rmDeltaV = null;
@@ -78,7 +79,7 @@ class RowingSession {
             //   2-11   rowing metrics log (11 = detection threshold)
             //   20-23  session summary
             //   30-39  accel log (1 Hz stats)
-            //   40-52  high-frequency accel (hf_0..hf_12)
+            //   40-53  high-frequency accel (hf_0..hf_12, 53 = hf_seq)
             //   60-64  radar raw log
             //   70-78  session averages of the rowing metrics
             //
@@ -137,7 +138,7 @@ class RowingSession {
             if (hfreq) {
                 // High-frequency mode: 25 fwd_accel samples/sec packed as 13 SINT32
                 // Each SINT32 = 2x sint16: low 16 bits = sample[2k], high = sample[2k+1]
-                // 13 fields + 2 base = 15 record fields, 60 bytes
+                // 13 fields + sequence + 2 base = 16 record fields, 64 bytes
                 hfreqFields = new [13];
                 for (var k = 0; k < 13; k++) {
                     hfreqFields[k] = session.createField(
@@ -146,6 +147,12 @@ class RowingSession {
                         {:mesgType => FitContributor.MESG_TYPE_RECORD, :units => "mG2"}
                     );
                 }
+                // 1-based index of the record's first sample in the 25 Hz
+                // stream, 0 for an empty record: lets a reader rebuild the
+                // signal exactly and see any gap
+                hfreqSeqField = session.createField(
+                    "hf_seq", 53, FitContributor.DATA_TYPE_UINT32,
+                    {:mesgType => FitContributor.MESG_TYPE_RECORD, :units => "samples"});
             } else if (app.featureConfig.isEnabled(FeatureConfig.FEAT_ACCEL_LOG)) {
                 // Low-frequency mode: 1Hz summary stats (10 fields)
                 rawXfield = session.createField(
@@ -288,6 +295,7 @@ class RowingSession {
         linMagMeanField = null; linMagEmaField = null;
         fwdAccelMeanField = null; fwdAccelMinField = null; fwdAccelMaxField = null;
         hfreqFields = null;
+        hfreqSeqField = null;
         rmForceRatio = null; rmDeltaV = null; rmDriveTime = null;
         rmRecovTime = null; rmCatchDur = null; rmCatchSlope = null;
         rmPeakAccel = null; rmAccelAvg = null; rmAccelMax = null;
@@ -314,6 +322,7 @@ class RowingSession {
         if (hfreqFields != null) {
             for (var k = 0; k < 13; k++) { hfreqFields[k].setData(0); }
         }
+        if (hfreqSeqField != null) { hfreqSeqField.setData(0); }
         if (rmAvgFields != null) {
             for (var k = 0; k < 9; k++) { rmAvgFields[k].setData(0.0); }
         }
@@ -398,13 +407,15 @@ class RowingSession {
         }
     }
 
-    // Write 25 packed high-frequency samples (13 SINT32 values)
-    function setHfreqData(packed) {
+    // Write 25 packed high-frequency samples (13 SINT32 values) and the
+    // sequence number of the first one (0 = empty record)
+    function setHfreqData(packed, seq) {
         if (hfreqFields != null) {
             for (var k = 0; k < 13; k++) {
                 hfreqFields[k].setData(packed[k]);
             }
         }
+        if (hfreqSeqField != null) { hfreqSeqField.setData(seq); }
     }
 
     // Write rowing metrics from StrokeDetector (called each second,

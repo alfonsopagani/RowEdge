@@ -125,9 +125,17 @@ def extract(fit_path):
         accel_rows.append((elapsed, ax, ay, az, lmin, lmax, lmean, lema,
                            fwd_mean, fwd_min, fwd_max))
 
-        # High-frequency forward accel (25 samples/sec packed as 13 SINT32)
+        # High-frequency forward accel (25 samples/sec packed as 13 SINT32).
+        # Newer files carry hf_seq, the 1-based index of the record's first
+        # sample in the 25 Hz stream (0 = empty record): time then comes from
+        # the sample clock, so a late record does not shift or blank the signal.
         hf_samples = unpack_hfreq(d)
-        if hf_samples:
+        hf_seq = d.get('hf_seq')
+        if hf_samples and hf_seq is not None:
+            if hf_seq > 0:
+                for si, sv in enumerate(hf_samples):
+                    hfreq_rows.append(((hf_seq - 1 + si) / 25.0, sv))
+        elif hf_samples:
             dt = 1.0 / len(hf_samples)
             for si, sv in enumerate(hf_samples):
                 hfreq_rows.append((elapsed + si * dt, sv))

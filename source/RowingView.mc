@@ -312,7 +312,8 @@ class RowingView extends WatchUi.View {
             lastLinMagMean = stats[5];
             // High-frequency accel recording (25 samples/sec packed)
             if (app.featureConfig.isEnabled(FeatureConfig.FEAT_HFREQ_ACCEL)) {
-                session.setHfreqData(detector.getHfreqPacked());
+                var hfPacked = detector.getHfreqPacked();
+                session.setHfreqData(hfPacked, detector.hfreqLastSeq);
             }
             // Rowing metrics log
             if (app.featureConfig.isEnabled(FeatureConfig.FEAT_ROWING_LOG)) {

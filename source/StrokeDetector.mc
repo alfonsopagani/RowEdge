@@ -94,10 +94,19 @@ class StrokeDetector {
     var fwdAccelMin = 0.0;
     var fwdAccelMax = 0.0;
 
-    // High-frequency forward accel buffer (25 samples/sec, written to FIT)
-    const HFREQ_BUF_SIZE = 25;
-    var hfreqBuf = new [25];
-    var hfreqCount = 0;
+    // High-frequency forward accel queue (25 samples/sec, written to FIT).
+    // The sensor batches and the 1 s tick that writes the FIT record are not
+    // in step: a tick may find no new batch and the next one two. A queue of
+    // four seconds absorbs that, so no sample is dropped and at most the
+    // first late tick yields an empty record.
+    const HFREQ_REC = 25;           // samples per FIT record
+    const HFREQ_Q_SIZE = 100;
+    var hfreqQ = new [100];
+    var hfreqHead = 0;              // index of the oldest queued sample
+    var hfreqLen = 0;               // samples queued
+    var hfreqNextSeq = 1;           // sequence number of the oldest queued sample
+    var hfreqLastSeq = 0;           // sequence number of the first sample of the
+                                    // last packed record, 0 if it was empty
 
     // Decimation of the raw sensor rate down to 25 Hz (see onSensorData)
     var decSum = 0.0;
@@ -197,6 +206,10 @@ class StrokeDetector {
         emaValue = 0.0;
         prevEma = 0.0;
         wasPeak = false;
+        hfreqHead = 0;
+        hfreqLen = 0;
+        hfreqNextSeq = 1;
+        hfreqLastSeq = 0;
         effThreshold = catchThreshold;
         peakAvg = 0.0;
         curPeak = 0.0;
@@ -290,11 +303,8 @@ class StrokeDetector {
                 decSum = 0.0;
                 decCount = 0;
 
-                // Buffer for high-frequency FIT recording
-                if (hfreqCount < HFREQ_BUF_SIZE) {
-                    hfreqBuf[hfreqCount] = fwd25;
-                    hfreqCount++;
-                }
+                // Queue for high-frequency FIT recording
+                pushHfreq(fwd25);
 
                 // Ring buffer for stroke curve display
                 curveBuf[curveBufIdx] = fwd25;
@@ -417,11 +427,8 @@ class StrokeDetector {
         var fwdAccel = fwdAccelMg.toFloat();
         var mag = fwdAccel > 0 ? fwdAccel : -fwdAccel;
 
-        // High-frequency FIT buffer
-        if (hfreqCount < HFREQ_BUF_SIZE) {
-            hfreqBuf[hfreqCount] = fwdAccelMg;
-            hfreqCount++;
-        }
+        // High-frequency FIT queue
+        pushHfreq(fwdAccelMg);
 
         // Ring buffer for stroke curve display
         curveBuf[curveBufIdx] = fwdAccelMg;
@@ -677,19 +684,40 @@ class StrokeDetector {
         return stats;
     }
 
-    // Get high-frequency samples as array of packed SINT32 values.
+    // Queue one 25 Hz sample. When the queue is full (nobody is reading it,
+    // or four seconds of backlog) the oldest sample is dropped.
+    function pushHfreq(v) {
+        if (hfreqLen == HFREQ_Q_SIZE) {
+            hfreqHead = (hfreqHead + 1) % HFREQ_Q_SIZE;
+            hfreqLen--;
+            hfreqNextSeq++;
+        }
+        hfreqQ[(hfreqHead + hfreqLen) % HFREQ_Q_SIZE] = v;
+        hfreqLen++;
+    }
+
+    // Take the oldest 25 queued samples as an array of packed SINT32 values.
     // Each SINT32 packs 2 sint16: low 16 bits = sample[2k], high 16 bits = sample[2k+1]
-    // Returns array of 13 packed values (25 samples -> 12 pairs + 1 single).
+    // Returns 13 packed values (25 samples -> 12 pairs + 1 single) and sets
+    // hfreqLastSeq to the sequence number of the first sample. With fewer
+    // than 25 samples queued the record is empty: all zeros, hfreqLastSeq 0.
     function getHfreqPacked() {
         var packed = new [13];
+        if (hfreqLen < HFREQ_REC) {
+            for (var k = 0; k < 13; k++) { packed[k] = 0; }
+            hfreqLastSeq = 0;
+            return packed;
+        }
         for (var k = 0; k < 13; k++) {
-            var idx = k * 2;
-            var lo = (idx < hfreqCount) ? hfreqBuf[idx] : 0;
-            var hi = (idx + 1 < hfreqCount) ? hfreqBuf[idx + 1] : 0;
+            var lo = hfreqQ[(hfreqHead + k * 2) % HFREQ_Q_SIZE];
+            var hi = (k * 2 + 1 < HFREQ_REC) ? hfreqQ[(hfreqHead + k * 2 + 1) % HFREQ_Q_SIZE] : 0;
             // Pack: low 16 bits = lo, high 16 bits = hi
             packed[k] = (lo & 0xFFFF) | ((hi & 0xFFFF) << 16);
         }
-        hfreqCount = 0;
+        hfreqLastSeq = hfreqNextSeq;
+        hfreqHead = (hfreqHead + HFREQ_REC) % HFREQ_Q_SIZE;
+        hfreqLen -= HFREQ_REC;
+        hfreqNextSeq += HFREQ_REC;
         return packed;
     }
 
