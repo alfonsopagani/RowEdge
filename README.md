@@ -12,7 +12,20 @@ dmonakhov ([original app on the Connect IQ Store](https://apps.garmin.com/apps/9
 distributed under the same GPLv3 license. Source of this fork:
 <https://github.com/alfonsopagani/RowEdge>.
 
-Changes from RowEdge v0.7:
+## Version history
+
+**1.1** (in beta)
+
+- Auto Threshold (optional, in Features): stroke detection follows the
+  strength of the rowing, so light paddling and heavy boats are still counted.
+  With the fixed 200 mG threshold an eight lost 43% of its strokes
+- Stroke rates up to 44 spm (was 35)
+- Drive time, force ratio and catch metrics no longer upset by a single noisy
+  sample
+- Radar range and time-to-collision readable on the light theme
+- Redrawn home screen, launcher icon and badge
+
+**1.0**, changes from RowEdge v0.7
 
 - Garmin Connect charts and activity summary for the rowing data, with
   English and Italian labels (see [Garmin Connect](#garmin-connect))
@@ -20,7 +33,7 @@ Changes from RowEdge v0.7:
   the 25 Hz the stroke curve and metrics assume, stroke rate back from the
   second stroke after a pause
 - Dark mode, Speed field in km/h
-- New home screen, launcher icon and badge in blue and gold
+- Home screen, launcher icon and badge in blue and gold
   (`tools/gen_artwork.py` redraws them)
 
 The rest of this document describes the app; where it says RowEdge it applies
@@ -29,15 +42,14 @@ to RemoEdge as well.
 ## Screenshots
 
 <p align="center">
-  <img src="images/demo02/Edge1040.png" width="200" alt="Edge 1040 with sparklines"/>
-  <img src="images/demo02/edge-1050.png" width="200" alt="Edge 1050 with sparklines"/>
+  <img src="images/screens/home.png" width="200" alt="Home screen artwork"/>
+  <img src="images/screens/data-light.png" width="200" alt="Data screen, light theme"/>
+  <img src="images/screens/data-dark.png" width="200" alt="Data screen, dark theme"/>
 </p>
-<p align="center">
-  <img src="images/demo01/activity-acc-curve-default.png" width="160" alt="Accel Curve z4"/>
-  <img src="images/demo01/activity-acc-curve-z2.png" width="160" alt="Accel Curve z2"/>
-  <img src="images/demo01/activity-split-default.png" width="160" alt="Split view z4"/>
-  <img src="images/demo01/activity-z7.png" width="160" alt="All fields z7"/>
-</p>
+
+Edge 1050: home screen artwork, then the data screen at zoom z4 (acceleration
+curve, split, heart rate, stroke rate, distance, time) in the light and dark
+themes. The green bar on the right of the dark screen is the radar warning.
 
 ## Why?
 
@@ -50,7 +62,7 @@ features specific to the sport.
 
 ### Core Rowing Metrics
 - **Split time /500m** from GPS distance (10s sliding window, proper v=dx/dt)
-- **Stroke rate (SPM)** from forward acceleration -- event-based interval averaging
+- **Stroke rate (SPM)** from forward acceleration -- event-based interval averaging, up to 44 spm
 - **Heart rate** from paired ANT+ HR sensor
 - **Activity recording** as FIT SPORT_ROWING with custom fields
 
@@ -87,7 +99,8 @@ features specific to the sport.
 - **High-frequency accel logging** -- 25Hz forward accel packed to FIT (13 SINT32 fields)
 - **Rowing metrics logging** -- per-stroke FR, delta-V, D:R, catch metrics to FIT
 - **Radar raw logging** -- 8 targets range/speed + threat level to FIT
-- **Feature toggles** -- auto-pause, demo, curve metrics, accel/HF/rowing log
+- **Feature toggles** -- auto-pause, demo, curve metrics, accel/HF/rowing log, dark mode, auto threshold
+- **Auto threshold** -- optional: the detection threshold follows half of the typical stroke peak
 - **FIT data extraction** -- Python tool with gnuplot visualization (tools/fit_extract.py)
 
 ## Supported Devices
@@ -176,7 +189,8 @@ Press MENU to access settings:
   of the typical stroke peak, between 80 and 400 milliG, and follows it as the
   rowing gets lighter or harder. The manual value is the starting point
 - **Zoom Level**: number of visible fields
-- **Features**: toggle auto-pause, demo mode, curve metrics, accel/HF/rowing log
+- **Features**: toggle auto-pause, demo mode, curve metrics, accel/HF/rowing log,
+  dark mode, auto threshold
 
 ## Garmin Connect
 
