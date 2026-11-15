@@ -2,7 +2,7 @@ using Toybox.Application;
 using Toybox.WatchUi;
 using Toybox.System;
 
-const APP_VERSION = "v1.0";
+const APP_VERSION = "v1.1";
 
 class RowEdgeApp extends Application.AppBase {
 

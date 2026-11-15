@@ -13,6 +13,7 @@ class FeatureConfig {
         FEAT_RADAR_LOG,
         FEAT_SPARKLINES,
         FEAT_DARK_MODE,
+        FEAT_AUTO_THRESHOLD,
         FEAT_COUNT
     }
 
@@ -33,6 +34,7 @@ class FeatureConfig {
         enabled[FEAT_RADAR_LOG] = loadBool("feat_radarLog", false);
         enabled[FEAT_SPARKLINES] = loadBool("feat_sparklines", true);
         enabled[FEAT_DARK_MODE] = loadBool("feat_darkMode", false);
+        enabled[FEAT_AUTO_THRESHOLD] = loadBool("feat_autoThreshold", false);
     }
 
     function loadBool(key, defaultVal) {
@@ -48,7 +50,7 @@ class FeatureConfig {
         enabled[featId] = !enabled[featId];
         var keys = ["feat_autoPause", "feat_demoMode", "feat_accelLog", "feat_hfreqAccel",
                     "feat_curveMetrics", "feat_rowingLog", "feat_radarLog", "feat_sparklines",
-                    "feat_darkMode"];
+                    "feat_darkMode", "feat_autoThreshold"];
         Application.Storage.setValue(keys[featId], enabled[featId]);
     }
 
@@ -63,6 +65,7 @@ class FeatureConfig {
             case FEAT_RADAR_LOG: return "Radar Raw Log";
             case FEAT_SPARKLINES: return "Sparkline Graphs";
             case FEAT_DARK_MODE: return "Dark Mode";
+            case FEAT_AUTO_THRESHOLD: return "Auto Threshold";
             default: return "?";
         }
     }

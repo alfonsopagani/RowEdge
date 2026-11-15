@@ -169,7 +169,12 @@ make deploy
 
 Press MENU to access settings:
 - **Data Fields**: reorder, add, remove fields (priority order)
-- **Threshold**: stroke detection sensitivity (milliG, default 200)
+- **Threshold**: stroke detection sensitivity (milliG, default 200). Heavier
+  boats accelerate less: about 150 for a four and 120 for an eight are
+  reasonable starting points
+- **Auto Threshold** (in Features, off by default): sets the threshold to half
+  of the typical stroke peak, between 80 and 400 milliG, and follows it as the
+  rowing gets lighter or harder. The manual value is the starting point
 - **Zoom Level**: number of visible fields
 - **Features**: toggle auto-pause, demo mode, curve metrics, accel/HF/rowing log
 

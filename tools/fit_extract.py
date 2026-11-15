@@ -27,6 +27,7 @@ ROWING_FIELDS = [
     ('force_ratio', ''), ('delta_v', 'm/s'), ('drive_time', 's'),
     ('recov_time', 's'), ('catch_dur', 's'), ('catch_slope', 'mG/s'),
     ('peak_accel', 'mG'), ('accel_avg', 'mG'), ('accel_max', 'mG'),
+    ('threshold', 'mG'),
 ]
 
 def semicircles_to_deg(sc):

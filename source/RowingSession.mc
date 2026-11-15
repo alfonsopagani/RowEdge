@@ -42,6 +42,7 @@ class RowingSession {
     var rmPeakAccel = null;
     var rmAccelAvg = null;
     var rmAccelMax = null;
+    var rmThreshold = null;   // detection threshold in use (mG), for tuning
     // Session averages of the nine rowing metrics (ids 70-78). The first
     // seven are averaged once per stroke, the last two once per second.
     var rmAvgFields = null;
@@ -74,7 +75,7 @@ class RowingSession {
             // Field ids must be unique across the whole app: Garmin Connect
             // matches each id to its label in resources/fitcontributions.
             //   0-1    stroke rate, distance per stroke (always)
-            //   2-10   rowing metrics log
+            //   2-11   rowing metrics log (11 = detection threshold)
             //   20-23  session summary
             //   30-39  accel log (1 Hz stats)
             //   40-52  high-frequency accel (hf_0..hf_12)
@@ -199,7 +200,7 @@ class RowingSession {
                 );
             } else if (app.featureConfig.isEnabled(FeatureConfig.FEAT_ROWING_LOG)) {
                 // Rowing metrics: 9 fields, per-stroke values written each second
-                // 2 base + 9 = 11 record fields, 41 bytes
+                // 2 base + 10 = 12 record fields, 43 bytes
                 rmForceRatio = session.createField(
                     "force_ratio", 2, FitContributor.DATA_TYPE_FLOAT,
                     {:mesgType => FitContributor.MESG_TYPE_RECORD, :units => ""});
@@ -226,6 +227,10 @@ class RowingSession {
                     {:mesgType => FitContributor.MESG_TYPE_RECORD, :units => "mG"});
                 rmAccelMax = session.createField(
                     "accel_max", 10, FitContributor.DATA_TYPE_SINT16,
+                    {:mesgType => FitContributor.MESG_TYPE_RECORD, :units => "mG"});
+                // Not declared in fitContributions: no chart, tools read it by name
+                rmThreshold = session.createField(
+                    "threshold", 11, FitContributor.DATA_TYPE_SINT16,
                     {:mesgType => FitContributor.MESG_TYPE_RECORD, :units => "mG"});
 
                 // Session averages, same order as the record fields above.
@@ -286,6 +291,7 @@ class RowingSession {
         rmForceRatio = null; rmDeltaV = null; rmDriveTime = null;
         rmRecovTime = null; rmCatchDur = null; rmCatchSlope = null;
         rmPeakAccel = null; rmAccelAvg = null; rmAccelMax = null;
+        rmThreshold = null;
         rmAvgFields = null;
         rlRanges = null; rlSpeeds = null; rlCount = null;
         rlClosest = null; rlThreat = null;
@@ -296,7 +302,7 @@ class RowingSession {
                     totalStrokesField, rawXfield, rawYfield, rawZfield,
                     linMagMinField, linMagMaxField, linMagMeanField, linMagEmaField,
                     fwdAccelMeanField, fwdAccelMinField, fwdAccelMaxField,
-                    rmPeakAccel, rmAccelAvg, rmAccelMax, rlCount, rlThreat];
+                    rmPeakAccel, rmAccelAvg, rmAccelMax, rmThreshold, rlCount, rlThreat];
         for (var i = 0; i < ints.size(); i++) {
             if (ints[i] != null) { ints[i].setData(0); }
         }
@@ -445,6 +451,7 @@ class RowingSession {
         if (rmPeakAccel != null) { rmPeakAccel.setData(rowing ? det.strokePeak.toNumber() : 0); }
         if (rmAccelAvg != null) { rmAccelAvg.setData(accelAvg.toNumber()); }
         if (rmAccelMax != null) { rmAccelMax.setData(accelMax.toNumber()); }
+        if (rmThreshold != null) { rmThreshold.setData(det.effThreshold.toNumber()); }
 
         // Session averages, only while the timer runs
         if (rmAvgFields != null && isRecording()) {

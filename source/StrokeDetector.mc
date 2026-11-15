@@ -57,9 +57,24 @@ class StrokeDetector {
     // Tuning: adjustable at runtime via menu
     var catchThreshold = 200.0;
 
+    // Threshold actually in use. Manual mode: equals catchThreshold.
+    // Auto mode (Features > Auto Threshold): a fraction of the typical
+    // smoothed stroke peak, so light rowing and heavy boats (lower
+    // accelerations) are still detected.
+    const AUTO_FRACTION = 0.5;    // threshold / typical stroke peak
+    const AUTO_MIN = 80.0;        // mG, floor against noise
+    const AUTO_MAX = 400.0;       // mG
+    const AUTO_RESEED_MS = 6000;  // no stroke for this long: re-seed
+    var autoThreshold = false;
+    var effThreshold = 200.0;
+    var peakAvg = 0.0;            // running average of smoothed stroke peaks
+    var curPeak = 0.0;            // highest value of the excursion in progress
+    var quietMax = 0.0;           // highest value since the last stroke / re-seed
+    var quietSince = 0;           // ms
+
     // Fixed constants
     const EMA_ALPHA = 0.15;
-    const MIN_STROKE_INTERVAL = 1700; // ms, max 35 spm
+    const MIN_STROKE_INTERVAL = 1360; // ms, max 44 spm
     const MAX_STROKE_INTERVAL = 15000; // ms, min 4 spm
 
     // 1-second statistics for FIT recording
@@ -182,6 +197,11 @@ class StrokeDetector {
         emaValue = 0.0;
         prevEma = 0.0;
         wasPeak = false;
+        effThreshold = catchThreshold;
+        peakAvg = 0.0;
+        curPeak = 0.0;
+        quietMax = 0.0;
+        quietSince = 0;
         decSum = 0.0;
         decCount = 0;
         calibrating = false;
@@ -223,11 +243,20 @@ class StrokeDetector {
             return;
         }
 
+        processSamples(xData, yData, zData, n, now);
+    }
+
+    // Stroke detection on one sensor batch of n samples; 'now' is the time
+    // of its last sample in ms. Separate from onSensorData() so it can be
+    // driven with recorded or synthetic data.
+    function processSamples(xData, yData, zData, n, now) {
         // Raw samples per 25 Hz sample. The listener asks for the maximum
         // sample rate, which is 100 Hz on current Edge devices (4 raw samples
         // per 25 Hz sample); with 25 samples per batch this is 1 (no change).
         var dec = n / 25;
         if (dec < 1) { dec = 1; }
+
+        updateThresholdMode(now);
 
         for (var i = 0; i < n; i++) {
             var rx = xData[i].toFloat();
@@ -300,7 +329,9 @@ class StrokeDetector {
             emaValue = EMA_ALPHA * detectionSignal + (1.0 - EMA_ALPHA) * emaValue;
 
             // Stroke detection: drive phase produces positive forward accel peak
-            var isPeak = (emaValue > catchThreshold);
+            var isPeak = (emaValue > effThreshold);
+            if (isPeak && emaValue > curPeak) { curPeak = emaValue; }
+            if (emaValue > quietMax) { quietMax = emaValue; }
 
             if (wasPeak && !isPeak) {
                 // Time of this sample, not of the callback: the sensor
@@ -317,18 +348,65 @@ class StrokeDetector {
                     snapshotStrokeCurve(interval);
                     recordStrokeTime(ts);
                     lastStrokeTime = ts;
+                    onStrokePeak(curPeak, ts);
                 } else if (lastStrokeTime == 0 ||
                            interval > MAX_STROKE_INTERVAL) {
                     strokeCount++;
                     snapshotStrokeCurve(interval);
                     recordStrokeTime(ts);
                     lastStrokeTime = ts;
+                    onStrokePeak(curPeak, ts);
                 }
+                curPeak = 0.0;
             }
 
             wasPeak = isPeak;
             prevEma = emaValue;
         }
+
+        // Auto mode: no stroke for a while (the rowing got lighter than the
+        // threshold, or the boat stopped). Start again from the largest swing
+        // seen in the meantime.
+        if (autoThreshold && now - quietSince > AUTO_RESEED_MS) {
+            effThreshold = clampThreshold(AUTO_FRACTION * quietMax);
+            peakAvg = 0.0;
+            quietMax = 0.0;
+            quietSince = now;
+        }
+    }
+
+    function clampThreshold(v) {
+        if (v < AUTO_MIN) { return AUTO_MIN; }
+        if (v > AUTO_MAX) { return AUTO_MAX; }
+        return v;
+    }
+
+    // Called once per sensor batch (and per demo sample).
+    function updateThresholdMode(now) {
+        var auto = Application.getApp().featureConfig.isEnabled(FeatureConfig.FEAT_AUTO_THRESHOLD);
+        if (!auto) {
+            effThreshold = catchThreshold;
+            peakAvg = 0.0;
+        } else if (!autoThreshold || quietSince == 0 || now < quietSince) {
+            // just switched on, first batch, or timer restart: begin at the manual value
+            effThreshold = clampThreshold(catchThreshold);
+            peakAvg = 0.0;
+            quietMax = 0.0;
+            quietSince = now;
+        }
+        autoThreshold = auto;
+    }
+
+    // A stroke was counted; 'peak' is the highest smoothed value it reached.
+    function onStrokePeak(peak, ts) {
+        if (autoThreshold) {
+            // one knock on the hull must not push the threshold out of reach
+            if (peakAvg > 0 && peak > 2 * peakAvg) { peak = 2 * peakAvg; }
+            peakAvg = (peakAvg <= 0) ? peak : (0.7 * peakAvg + 0.3 * peak);
+            effThreshold = clampThreshold(AUTO_FRACTION * peakAvg);
+        }
+        quietMax = 0.0;
+        quietSince = ts;
     }
 
     // Process a single pre-computed forward acceleration sample (demo mode).
@@ -369,7 +447,10 @@ class StrokeDetector {
 
         // EMA stroke detection (forward accel directly)
         emaValue = EMA_ALPHA * fwdAccel + (1.0 - EMA_ALPHA) * emaValue;
-        var isPeak = (emaValue > catchThreshold);
+        updateThresholdMode(now);
+        var isPeak = (emaValue > effThreshold);
+        if (isPeak && emaValue > curPeak) { curPeak = emaValue; }
+        if (emaValue > quietMax) { quietMax = emaValue; }
 
         if (wasPeak && !isPeak) {
             // Use sample count for interval (accurate, unlike System.getTimer
@@ -385,6 +466,7 @@ class StrokeDetector {
                 recordStrokeTime(now);
                 lastStrokeTime = now;
                 demoLastStrokeSample = demoSampleCount;
+                onStrokePeak(curPeak, now);
             } else if (demoLastStrokeSample == 0 ||
                        intervalMs > MAX_STROKE_INTERVAL) {
                 strokeCount++;
@@ -392,7 +474,9 @@ class StrokeDetector {
                 recordStrokeTime(now);
                 lastStrokeTime = now;
                 demoLastStrokeSample = demoSampleCount;
+                onStrokePeak(curPeak, now);
             }
+            curPeak = 0.0;
         }
         wasPeak = isPeak;
         prevEma = emaValue;
@@ -455,29 +539,41 @@ class StrokeDetector {
             strokeCurve[i] = curveBuf[(startIdx + i) % CURVE_BUF_SIZE];
         }
 
-        // Find peak and its index
+        // Locate the drive on a 3-sample moving average of the curve. On the
+        // raw samples a single negative sample inside the drive cut it short,
+        // and an isolated spike elsewhere was taken for the whole drive
+        // (drive time of 1-2 samples, force ratio 1).
         var dt = 0.04;  // 1/25Hz = 40ms
-        var peak = 0.0;
+        var sm = new [nSamples];
+        for (var i = 0; i < nSamples; i++) {
+            var a = (i > 0) ? strokeCurve[i - 1] : strokeCurve[i];
+            var b = (i < nSamples - 1) ? strokeCurve[i + 1] : strokeCurve[i];
+            sm[i] = (a + strokeCurve[i] + b) / 3.0;
+        }
+        var smPeak = 0.0;
         var peakIdx = 0;
         for (var i = 0; i < nSamples; i++) {
-            var v = strokeCurve[i].toFloat();
-            if (v > peak) { peak = v; peakIdx = i; }
+            if (sm[i] > smPeak) { smPeak = sm[i]; peakIdx = i; }
         }
 
-        // Find drive phase boundaries: scan outward from peak to find
-        // zero-crossings. This identifies the contiguous positive region
-        // around the peak, ignoring noise elsewhere.
+        // Drive phase: the contiguous positive region of the smoothed curve
+        // around its peak.
         var driveStart = peakIdx;
         var driveEnd = peakIdx;
-        // Scan backward from peak to find start of drive (last zero-crossing before peak)
         for (var i = peakIdx - 1; i >= 0; i--) {
-            if (strokeCurve[i] <= 0) { break; }
+            if (sm[i] <= 0) { break; }
             driveStart = i;
         }
-        // Scan forward from peak to find end of drive (first zero-crossing after peak)
         for (var i = peakIdx + 1; i < nSamples; i++) {
-            if (strokeCurve[i] <= 0) { break; }
+            if (sm[i] <= 0) { break; }
             driveEnd = i;
+        }
+
+        // Peak acceleration: highest raw sample inside the drive
+        var peak = 0.0;
+        for (var i = driveStart; i <= driveEnd; i++) {
+            var v = strokeCurve[i].toFloat();
+            if (v > peak) { peak = v; }
         }
 
         var driveSamples = driveEnd - driveStart + 1;
