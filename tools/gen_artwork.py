@@ -104,52 +104,144 @@ def draw_badge(im, cx, cy, R, wordmark=True, simple=False):
     im.paste(layer, (0, 0), Image.composite(layer.getchannel("A"), Image.new("L", (W, H), 0), mask))
     dr = ImageDraw.Draw(im)
 
-    # --- boat (over the ring), rower, one oar
-    hull_y = 0.44
+    # --- boat, rower and oar, painted as brush strokes: circles stamped along
+    # curves, so every limb is rounded and tapered
+    def bez(p0, p1, p2, t):
+        u = 1 - t
+        return (u * u * p0[0] + 2 * u * t * p1[0] + t * t * p2[0],
+                u * u * p0[1] + 2 * u * t * p1[1] + t * t * p2[1])
+
+    def brush(p0, p1, p2, w0, w1, fill, t0=0.0, t1=1.0, grow=0.0):
+        steps = 90
+        for s in range(steps + 1):
+            t = t0 + (t1 - t0) * s / steps
+            x, y = P(*bez(p0, p1, p2, t))
+            r = (w0 + (w1 - w0) * t + grow) * R
+            dr.ellipse([x - r, y - r, x + r, y + r], fill=fill)
+
+    def outlined(p0, p1, p2, w0, w1, fill):
+        brush(p0, p1, p2, w0, w1, NAVY_DK, grow=ol)
+        brush(p0, p1, p2, w0, w1, fill)
+
+    ol = 0.017 * k                      # outline thickness, in units of R
+    fat = 1.3 if simple else 1.0        # heavier figure at icon size
+
+    # joints of the figure, at the catch: seated low in the boat, body swung
+    # forward from the hips, arms long, knees up
+    hip = (0.17, 0.465)
+    back = (0.12, 0.275)                # control point: the curve of the back
+    sh = (-0.055, 0.135)
+    knee = (-0.13, 0.238)
+    foot = (-0.33, 0.470)
+    elbow = (-0.245, 0.250)
+    hand = (-0.415, 0.262)
+
+    # legs: thighs rise to the knees, shins drop to the stretcher
+    brush(hip, (0.03, 0.285), knee, 0.066 * fat, 0.054 * fat, NAVY_DK)
+    brush(knee, (-0.24, 0.310), foot, 0.050 * fat, 0.038 * fat, NAVY_DK)
+
+    # neck first: the torso, drawn next, covers its base
+    hc = (sh[0] - 0.075, sh[1] - 0.112)
+    hr = 0.070 * fat
+    outlined((sh[0] - 0.015, sh[1] - 0.015), (sh[0] - 0.045, sh[1] - 0.065), hc, 0.031 * fat, 0.031 * fat, SKIN)
+
+    # torso in the club kit: narrow at the waist, broad at the shoulders,
+    # white with a navy and a gold band across the chest
+    tw0, tw1 = 0.064 * fat, 0.088 * fat
+    outlined(hip, back, sh, tw0, tw1, WHITE)
+
+    def band(ta, tb, fill, extra=0.0):
+        pts = []
+        for t, side in ((ta, 1), (tb, 1), (tb, -1), (ta, -1)):
+            c = bez(hip, back, sh, t)
+            d = bez(hip, back, sh, min(1.0, t + 0.02))
+            e = bez(hip, back, sh, max(0.0, t - 0.02))
+            tx, ty = d[0] - e[0], d[1] - e[1]
+            ln = math.hypot(tx, ty)
+            w = tw0 + (tw1 - tw0) * t + extra
+            pts.append(P(c[0] - ty / ln * w * side, c[1] + tx / ln * w * side))
+        dr.polygon(pts, fill=fill)
+
+    band(0.56, 0.70, NAVY)
+    band(0.70, 0.81, GOLD)
+    # navy shorts with a straight waistline: hips and thighs read as one shape
+    band(0.0, 0.25, NAVY_DK, ol)
+    brush(hip, back, sh, tw0, tw1, NAVY_DK, t0=0.0, t1=0.05, grow=ol)
+
+    # head in front of the torso, then the navy cap: dome tilted forward and a visor
+    hx_, hy_ = P(*hc)
+    r = (hr + ol) * R
+    dr.ellipse([hx_ - r, hy_ - r, hx_ + r, hy_ + r], fill=NAVY_DK)
+    r = hr * R
+    dr.ellipse([hx_ - r, hy_ - r, hx_ + r, hy_ + r], fill=SKIN)
+    x, y = hx_, hy_
+    cr = (hr + ol * 1.2) * R
+    dr.pieslice([x - cr, y - cr, x + cr, y + cr], 170, 350, fill=NAVY_DK)
+    brush((hc[0] - hr * 0.80, hc[1] - hr * 0.18), (hc[0] - hr * 1.5, hc[1] - hr * 0.22),
+          (hc[0] - hr * 2.05, hc[1] + hr * 0.08), 0.020 * fat, 0.012 * fat, NAVY_DK)
+
+    # hull, drawn over the legs and hips: the rower sits inside the shell
     hx = 0.98 if simple else 1.22
-    hull = [P(-hx, hull_y - 0.01), P(-0.7, hull_y - 0.045), P(0.7, hull_y - 0.045), P(hx, hull_y - 0.01),
-            P(0.7, hull_y + 0.055), P(-0.7, hull_y + 0.055)]
+    top = [bez((-hx, 0.462), (0.0, 0.392), (hx, 0.450), i / 40.0) for i in range(41)]
+    bot = [bez((hx, 0.450), (0.0, 0.715), (-hx, 0.462), i / 40.0) for i in range(41)]
+    hull = [P(*p) for p in top + bot]
     dr.polygon(hull, fill=WHITE)
     dr.line(hull + [hull[0]], fill=NAVY_DK, width=max(2, int(0.018 * R * k)), joint="curve")
     if not simple:
-        dr.line([P(-0.95, hull_y + 0.012), P(0.95, hull_y + 0.012)], fill=GOLD, width=max(2, int(0.02 * R)))
+        stripe = [P(*bez((-0.93, 0.486), (0.0, 0.462), (0.93, 0.476), i / 40.0)) for i in range(41)]
+        dr.line(stripe, fill=GOLD, width=max(2, int(0.022 * R)), joint="curve")
 
-    hip, sh = (0.12, 0.38), (-0.01, 0.10)
-    knee, foot = (-0.20, 0.25), (-0.40, 0.385)
-    hand = (-0.36, 0.22)
-    dr.line([P(*hip), P(*knee), P(*foot)], fill=NAVY_DK, width=int(0.085 * R * (1.25 if simple else 1)),
-            joint="curve")
-    tw = 0.085 * (1.25 if simple else 1)
-    dx, dy = sh[0] - hip[0], sh[1] - hip[1]
-    ln = math.hypot(dx, dy)
-    nx, ny = -dy / ln * tw, dx / ln * tw
-
-    def tor(t0, t1):
-        a = (hip[0] + dx * t0, hip[1] + dy * t0)
-        c = (hip[0] + dx * t1, hip[1] + dy * t1)
-        return [P(a[0] - nx, a[1] - ny), P(a[0] + nx, a[1] + ny), P(c[0] + nx, c[1] + ny), P(c[0] - nx, c[1] - ny)]
-
-    # torso in the club kit: white with a navy and a gold band
-    dr.polygon(tor(0.0, 1.0), fill=WHITE)
-    dr.polygon(tor(0.40, 0.56), fill=NAVY)
-    dr.polygon(tor(0.56, 0.68), fill=GOLD)
-    body = tor(0.0, 1.0)
-    dr.line(body + [body[0]], fill=NAVY_DK, width=max(2, int(0.016 * R * k)), joint="curve")
-    hc = P(sh[0] - 0.035, sh[1] - 0.10)
-    hr = 0.072 * R * (1.2 if simple else 1)
-    dr.ellipse([hc[0] - hr, hc[1] - hr, hc[0] + hr, hc[1] + hr], fill=SKIN, outline=NAVY_DK,
-               width=max(2, int(0.016 * R * k)))
-    dr.pieslice([hc[0] - hr, hc[1] - hr, hc[0] + hr, hc[1] + hr], 180, 360, fill=NAVY_DK)
-    dr.line([P(sh[0], sh[1] + 0.06), P(*hand)], fill=SKIN, width=int(0.055 * R * (1.3 if simple else 1)))
+    # oar: straight shaft over the gunwale to a hatchet blade. Proportions of
+    # a sculling hatchet: about twice as long as deep, shaft joining at the
+    # top corner and running along the top edge, deepest a third of the way
+    # out, narrower at the tip, rounded corners.
     bx = -0.80 if simple else -0.98
-    blade = P(bx, 0.56)
-    dr.line([P(*hand), blade], fill=NAVY_DK, width=max(3, int(0.03 * R * k)))
-    dr.ellipse([blade[0] - 0.13 * R, blade[1] - 0.045 * R, blade[0] + 0.13 * R, blade[1] + 0.045 * R],
-               fill=GOLD, outline=NAVY_DK, width=max(2, int(0.014 * R * k)))
+    neck = (bx + 0.25, 0.455)
+    ux, uy = neck[0] - hand[0], neck[1] - hand[1]
+    ul = math.hypot(ux, uy)
+    ux, uy = ux / ul, uy / ul           # along the shaft, towards the tip
+    vx, vy = -uy, ux                    # across the shaft, towards the water
+    if vy < 0:
+        vx, vy = -vx, -vy
+    bl = 0.37 * (1.1 if simple else 1.0)        # blade length
+    bh = 0.175 * (1.1 if simple else 1.0)       # depth at the broadest point
+
+    def Bu(u, v):
+        return (neck[0] + ux * u + vx * v, neck[1] + uy * u + vy * v)
+
+    def seg(p0, p1, p2, n=10):
+        return [P(*Bu(*bez(p0, p1, p2, i / float(n)))) for i in range(n + 1)]
+
+    tipd = 0.76 * bh                    # depth at the tip
+    blade = [P(*Bu(-0.05, -0.014)), P(*Bu(bl - 0.035, -0.022))]
+    blade += seg((bl - 0.035, -0.022), (bl + 0.006, -0.022), (bl + 0.008, 0.016))      # top corner
+    blade += seg((bl + 0.008, 0.016), (bl + 0.014, tipd * 0.5), (bl + 0.004, tipd - 0.03))  # tip
+    blade += seg((bl + 0.004, tipd - 0.03), (bl + 0.002, tipd + 0.004), (bl - 0.035, tipd + 0.008))  # lower corner
+    blade += seg((bl - 0.035, tipd + 0.008), (bl * 0.68, bh * 0.99), (bl * 0.36, bh))  # lower edge
+    blade += seg((bl * 0.36, bh), (bl * 0.17, bh * 1.0), (bl * 0.10, bh * 0.48))       # heel
+    blade += seg((bl * 0.10, bh * 0.48), (bl * 0.05, bh * 0.12), (-0.05, 0.014))       # sweep into the neck
+    dr.polygon(blade, fill=WHITE)
+    dr.line(blade + [blade[0]], fill=NAVY_DK, width=max(2, int(ol * R * 1.1)), joint="curve")
+    spine = Bu(bl * 0.62, 0.0)
+    brush(hand, ((hand[0] + spine[0]) / 2, (hand[1] + spine[1]) / 2), spine, 0.016 * fat, 0.008 * fat, NAVY_DK)
+
+    # arm in front of torso and oar: a rounded shoulder tapering to the hand,
+    # drawn as one shape (all outlines, then all fills) so the elbow shows no
+    # inner contour
+    arm_a = ((sh[0] + 0.012, sh[1] + 0.030), (-0.13, 0.212), elbow, 0.047 * fat, 0.031 * fat)
+    arm_b = (elbow, (-0.33, 0.268), hand, 0.031 * fat, 0.027 * fat)
+    for part in (arm_a, arm_b):
+        brush(part[0], part[1], part[2], part[3], part[4], NAVY_DK, grow=ol)
+    for part in (arm_a, arm_b):
+        brush(part[0], part[1], part[2], part[3], part[4], SKIN)
+
     if not simple:
-        for sx, sy, sr in ((-1.10, 0.47, 0.030), (-1.00, 0.44, 0.022), (-0.90, 0.47, 0.018)):
-            p = P(sx, sy)
-            dr.ellipse([p[0] - sr * R, p[1] - sr * R, p[0] + sr * R, p[1] + sr * R], fill=WHITE)
+        # spray thrown up by the blade
+        brush(Bu(bl * 0.85, -0.03), Bu(bl + 0.07, -0.13), Bu(bl + 0.17, -0.08), 0.013, 0.003, WHITE)
+        brush(Bu(bl * 0.55, -0.04), Bu(bl * 0.75, -0.15), Bu(bl + 0.02, -0.17), 0.011, 0.003, WHITE)
+        for u, v, sr in ((bl + 0.21, -0.03, 0.014), (bl + 0.08, -0.20, 0.010), (bl + 0.15, 0.04, 0.008)):
+            px_, py_ = P(*Bu(u, v))
+            dr.ellipse([px_ - sr * R, py_ - sr * R, px_ + sr * R, py_ + sr * R], fill=WHITE)
 
     # --- wordmark banner across the badge
     by0, by1 = cy - 0.47 * R, cy - 0.13 * R
