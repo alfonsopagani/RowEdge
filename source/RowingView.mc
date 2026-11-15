@@ -908,8 +908,9 @@ class RowingView extends WatchUi.View {
             dc.setColor(color, color);
             dc.fillRectangle(w - barW, 0, barW, h);
 
-            // Show distance + TTC at top-right
-            dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            // Show distance + TTC at top-right, in the theme's text color
+            // (it was always white: invisible on the light theme)
+            dc.setColor(colFg, Graphics.COLOR_TRANSPARENT);
             var radarText = radar.closestRange.format("%d") + "m";
             if (radar.closestTTC < 30) {
                 radarText += " " + radar.closestTTC.format("%.0f") + "s";
