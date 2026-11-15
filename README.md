@@ -51,6 +51,17 @@ Edge 1050: home screen artwork, then the data screen at zoom z4 (acceleration
 curve, split, heart rate, stroke rate, distance, time) in the light and dark
 themes. The green bar on the right of the dark screen is the radar warning.
 
+<p align="center">
+  <img src="images/screens/edge540-zoom-z2.png" width="160" alt="Edge 540, zoom z2"/>
+  <img src="images/screens/edge540-split.png" width="160" alt="Edge 540, split as main field"/>
+  <img src="images/screens/edge540-settings.png" width="160" alt="Edge 540, settings menu"/>
+  <img src="images/screens/edge540-features.png" width="160" alt="Edge 540, features menu"/>
+</p>
+
+Edge 540/840, from RowEdge and unchanged in RemoEdge: zoom z2 (two fields),
+split as the main field, the settings menu and the features menu. The data
+screens were taken in demo mode, hence the label in the corner.
+
 ## Why?
 
 Outdoor rowing has very few sport performance computers. The dominant product
