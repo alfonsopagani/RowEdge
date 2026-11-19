@@ -19,9 +19,11 @@ distributed under the same GPLv3 license. Source of this fork:
 - Auto Threshold (optional, in Features): stroke detection follows the
   strength of the rowing, so light paddling and heavy boats are still counted.
   With the fixed 200 mG threshold an eight lost 43% of its strokes
-- Stroke rates up to 44 spm (was 35)
+- Stroke rates up to 50 spm (was 35)
 - Drive time, force ratio and catch metrics no longer upset by a single noisy
   sample
+- Stroke rate follows starts and rate changes within about 3 strokes, drops to
+  0 within 6 s when rowing stops, and is rounded (not truncated) in the FIT file
 - Radar range and time-to-collision readable on the light theme
 - Redrawn home screen, launcher icon and badge
 
@@ -73,7 +75,7 @@ features specific to the sport.
 
 ### Core Rowing Metrics
 - **Split time /500m** from GPS distance (10s sliding window, proper v=dx/dt)
-- **Stroke rate (SPM)** from forward acceleration -- event-based interval averaging, up to 44 spm
+- **Stroke rate (SPM)** from forward acceleration -- average of the last 3 stroke intervals, up to 50 spm, 0 after 6 s without strokes
 - **Heart rate** from paired ANT+ HR sensor
 - **Activity recording** as FIT SPORT_ROWING with custom fields
 

@@ -29,9 +29,16 @@ class StrokeDetector {
     var strokeCount = 0;
     var strokeRate = 0.0;
     var lastStrokeTime = 0;
+    var upTs = 0;          // time the smoothed signal rose above the threshold
+    var demoUpSample = 0;  // same, in demo samples
 
-    // Circular buffer of last N stroke timestamps for SPM calculation
-    const SPM_WINDOW = 6;  // average over last 6 strokes
+    // Circular buffer of last N stroke timestamps for SPM calculation.
+    // 4 timestamps = average of the last 3 stroke intervals: follows starts
+    // and rate changes within about 3 strokes.
+    const SPM_WINDOW = 4;
+    // No stroke for this long: the rate drops to 0 (at least 6 s, longer
+    // only for very slow paddling)
+    const STOP_MS = 6000;
     var strokeTimes = new [10];
     var strokeTimesIdx = 0;
     var strokeTimesCount = 0;
@@ -74,7 +81,7 @@ class StrokeDetector {
 
     // Fixed constants
     const EMA_ALPHA = 0.15;
-    const MIN_STROKE_INTERVAL = 1360; // ms, max 44 spm
+    const MIN_STROKE_INTERVAL = 1200; // ms, max 50 spm
     const MAX_STROKE_INTERVAL = 15000; // ms, min 4 spm
 
     // 1-second statistics for FIT recording
@@ -201,6 +208,8 @@ class StrokeDetector {
         strokeCount = 0;
         strokeRate = 0.0;
         lastStrokeTime = 0;
+        upTs = 0;
+        demoUpSample = 0;
         strokeTimesIdx = 0;
         strokeTimesCount = 0;
         emaValue = 0.0;
@@ -343,12 +352,17 @@ class StrokeDetector {
             if (isPeak && emaValue > curPeak) { curPeak = emaValue; }
             if (emaValue > quietMax) { quietMax = emaValue; }
 
+            // Time of this sample, not of the callback: the sensor delivers
+            // one batch per second and 'now' is the same for every sample in
+            // it. Using 'now' made all stroke intervals whole seconds.
+            var tSample = now - ((n - 1 - i) * 1000 / n);
+            if (isPeak && !wasPeak) { upTs = tSample; }
+
             if (wasPeak && !isPeak) {
-                // Time of this sample, not of the callback: the sensor
-                // delivers one batch per second and 'now' is the same for
-                // every sample in it. Using 'now' made all stroke intervals
-                // whole seconds (2 s or 3 s at 22 spm instead of 2.7 s).
-                var ts = now - ((n - 1 - i) * 1000 / n);
+                // The stroke is timed at the middle of the excursion above
+                // the threshold: steadier from stroke to stroke than the
+                // moment it drops back below (Hermsen 2013, sec. 4.4.2)
+                var ts = (upTs > 0 && upTs < tSample) ? (upTs + tSample) / 2 : tSample;
                 var interval = ts - lastStrokeTime;
 
                 if (lastStrokeTime > 0 &&
@@ -458,11 +472,15 @@ class StrokeDetector {
         var isPeak = (emaValue > effThreshold);
         if (isPeak && emaValue > curPeak) { curPeak = emaValue; }
         if (emaValue > quietMax) { quietMax = emaValue; }
+        if (isPeak && !wasPeak) { demoUpSample = demoSampleCount; }
 
         if (wasPeak && !isPeak) {
             // Use sample count for interval (accurate, unlike System.getTimer
-            // which has 1s granularity when 25 samples share the same tick)
-            var sampleInterval = demoSampleCount - demoLastStrokeSample;
+            // which has 1s granularity when 25 samples share the same tick).
+            // Strokes are timed at the middle of the threshold crossing, in
+            // half samples to stay in whole numbers.
+            var mid2 = (demoUpSample > 0) ? (demoUpSample + demoSampleCount) : 2 * demoSampleCount;
+            var sampleInterval = (mid2 - demoLastStrokeSample) / 2;
             var intervalMs = sampleInterval * 40;  // 25Hz = 40ms per sample
 
             if (demoLastStrokeSample > 0 &&
@@ -472,7 +490,7 @@ class StrokeDetector {
                 snapshotStrokeCurve(intervalMs);
                 recordStrokeTime(now);
                 lastStrokeTime = now;
-                demoLastStrokeSample = demoSampleCount;
+                demoLastStrokeSample = mid2;
                 onStrokePeak(curPeak, now);
             } else if (demoLastStrokeSample == 0 ||
                        intervalMs > MAX_STROKE_INTERVAL) {
@@ -480,7 +498,7 @@ class StrokeDetector {
                 snapshotStrokeCurve(intervalMs);
                 recordStrokeTime(now);
                 lastStrokeTime = now;
-                demoLastStrokeSample = demoSampleCount;
+                demoLastStrokeSample = mid2;
                 onStrokePeak(curPeak, now);
             }
             curPeak = 0.0;
@@ -611,10 +629,14 @@ class StrokeDetector {
         // minimum accel (deepest negative dip = catch impact).
         // Catch duration = time from min to driveStart (zero-crossing).
         // Catch slope = |min_accel| / catch_duration (mG/s).
+        // Found on the same 3-sample average as the drive: on raw samples one
+        // noisy sample set both the depth and the start of the catch, and the
+        // slope (depth / duration over 2-4 samples) varied five-fold between
+        // similar strokes.
         var minAccel = 0.0;
         var minIdx = driveStart;
         for (var i = 0; i < driveStart; i++) {
-            var v = strokeCurve[i].toFloat();
+            var v = sm[i];
             if (v < minAccel) { minAccel = v; minIdx = i; }
         }
         var catchSamples = driveStart - minIdx;
@@ -756,18 +778,17 @@ class StrokeDetector {
 
         var avgInterval = span.toFloat() / (count - 1);
 
-        // Estimate current stroke interval: time since last stroke,
-        // but at least avgInterval (don't speed up the estimate)
+        // Rowing stopped: no stroke for 6 s, or for twice the usual interval
+        // when paddling slower than 10 spm. The rate then reads 0 at once;
+        // until then it holds the last value. It used to blend the time
+        // since the last stroke into the average, so it slid down for up to
+        // 15 s and read low while rowing too.
         var sinceLast = (now - newest).toFloat();
-        var lastInterval = sinceLast > avgInterval ? sinceLast : avgInterval;
+        var stopMs = 2.0 * avgInterval;
+        if (stopMs < STOP_MS) { stopMs = STOP_MS; }
+        if (sinceLast > stopMs) { return 0.0; }
 
-        // If estimated interval exceeds max, no strokes happening
-        if (lastInterval > MAX_STROKE_INTERVAL) { return 0.0; }
-
-        // Normalized average: blend historical avg with current estimate
-        var normInterval = (avgInterval * (count - 1) + lastInterval) / count;
-
-        if (normInterval < MIN_STROKE_INTERVAL) { return 0.0; }
-        return 60000.0 / normInterval;
+        if (avgInterval < MIN_STROKE_INTERVAL) { return 0.0; }
+        return 60000.0 / avgInterval;
     }
 }

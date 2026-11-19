@@ -296,7 +296,8 @@ class RowingView extends WatchUi.View {
 
         if (session != null) {
             var stats = detector.getAccelStats();
-            session.setStrokeRate(strokeRate.toNumber());
+            // rounded, not truncated: 22.9 spm is 23, not 22
+            session.setStrokeRate((strokeRate + 0.5).toNumber());
             // FIT gets the instantaneous distance per stroke (speed / rate),
             // like the native cycle length of Garmin watches. The lap average
             // in 'dps' stays on screen: as a chart it is a flat line with a
@@ -1150,7 +1151,7 @@ class RowingView extends WatchUi.View {
             case FieldConfig.F_SPLIT:
                 return (splitTime > 0 && splitTime < 600) ? splitTime.toNumber() : 0;
             case FieldConfig.F_SPM:
-                return strokeRate > 0 ? strokeRate.toNumber() : 0;
+                return strokeRate > 0 ? (strokeRate + 0.5).toNumber() : 0;
             case FieldConfig.F_HR:
                 return heartRate > 0 ? heartRate : 0;
             case FieldConfig.F_SPEED:
