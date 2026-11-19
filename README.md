@@ -16,7 +16,7 @@ distributed under the same GPLv3 license. Source of this fork:
 
 **1.1** (in beta)
 
-- Auto Threshold (optional, in Features): stroke detection follows the
+- Auto Threshold (optional, in Stroke Detection): stroke detection follows the
   strength of the rowing, so light paddling and heavy boats are still counted.
   With the fixed 200 mG threshold an eight lost 43% of its strokes
 - Stroke rates up to 50 spm (was 35)
@@ -25,6 +25,9 @@ distributed under the same GPLv3 license. Source of this fork:
 - Stroke rate follows starts and rate changes within about 3 strokes, drops to
   0 within 6 s when rowing stops, and is rounded (not truncated) in the FIT file
 - Radar range and time-to-collision readable on the light theme
+- Settings grouped by category (Stroke Detection, Display, Radar, Recording),
+  a single FIT Log choice instead of four toggles, and new radar options to
+  turn the obstacle alerts or their tones off
 - Redrawn home screen, launcher icon and badge
 
 **1.0**, changes from RowEdge v0.7
@@ -97,7 +100,7 @@ features specific to the sport.
 - **Wahoo-style zoom** -- swipe up/down or UP/DOWN buttons, z1-z7
 - **Multi-device** -- Edge 540, 840, 1040, 1050 with per-device fonts and layout
 - **Touch support** -- swipe zoom, tap-to-configure, Picker for threshold, Menu2 for zoom
-- **Dark mode** -- black background with light text on the data screens, toggle in Features
+- **Dark mode** -- black background with light text on the data screens, toggle in Display
 - **Secondary hero** -- tall screens (1040/1050) show two full-width hero fields
 - **Configurable data fields** -- reorder, add, remove, Move to Top via menu
 - **Auto gravity calibration** -- 2-second static sampling with 300ms settle delay
@@ -112,7 +115,7 @@ features specific to the sport.
 - **High-frequency accel logging** -- 25Hz forward accel packed to FIT (13 SINT32 fields)
 - **Rowing metrics logging** -- per-stroke FR, delta-V, D:R, catch metrics to FIT
 - **Radar raw logging** -- 8 targets range/speed + threat level to FIT
-- **Feature toggles** -- auto-pause, demo, curve metrics, accel/HF/rowing log, dark mode, auto threshold
+- **Settings by category** -- stroke detection, display, radar, recording, with the current state shown in the menu
 - **Auto threshold** -- optional: the detection threshold follows half of the typical stroke peak
 - **FIT data extraction** -- Python tool with gnuplot visualization (tools/fit_extract.py)
 
@@ -193,23 +196,45 @@ make deploy
 
 ## Configuration
 
-Press MENU to access settings:
-- **Data Fields**: reorder, add, remove fields (priority order)
-- **Threshold**: stroke detection sensitivity (milliG, default 200). Heavier
-  boats accelerate less: about 150 for a four and 120 for an eight are
-  reasonable starting points
-- **Auto Threshold** (in Features, off by default): sets the threshold to half
-  of the typical stroke peak, between 80 and 400 milliG, and follows it as the
-  rowing gets lighter or harder. The manual value is the starting point
-- **Zoom Level**: number of visible fields
-- **Features**: toggle auto-pause, demo mode, curve metrics, accel/HF/rowing log,
-  dark mode, auto threshold
+Press MENU (or tap the screen) to open Settings. Each entry shows its current
+state on the second line.
+
+```
+Settings
+├─ Data Fields          reorder, add, remove fields (priority order)
+├─ Zoom Level           number of visible fields
+├─ Stroke Detection
+│   ├─ Auto Threshold   off by default
+│   └─ Threshold        manual value, milliG, default 200
+├─ Display
+│   ├─ Dark Mode
+│   ├─ Sparkline Graphs
+│   └─ Curve Metrics    FR% and delta-V over the acceleration curve
+├─ Radar
+│   ├─ Obstacle Alerts  warning bar, tones and vibration (on by default)
+│   └─ Alert Sound      tones on warnings (on by default)
+├─ Recording
+│   ├─ Auto Pause       pauses below 0.5 m/s, resumes above 0.7 m/s
+│   └─ FIT Log          Rowing Metrics / HF Accel 25 Hz / Accel 1 Hz /
+│                       Radar Targets / Off
+└─ Demo Mode            replay of recorded strokes, nothing is saved
+```
+
+- **Threshold**: heavier boats accelerate less; about 150 for a four and 120
+  for an eight are reasonable starting points
+- **Auto Threshold**: sets the threshold to half of the typical stroke peak,
+  between 80 and 400 milliG, and follows it as the rowing gets lighter or
+  harder. The manual value is the starting point
+- **Obstacle Alerts** off: the radar still tracks targets for the Radar data
+  field and the radar log, but the warning bar, tones and vibration stay off
+- **FIT Log**: what the activity file records besides stroke rate and distance
+  per stroke; one at a time, since they share the space of the FIT record
 
 ## Garmin Connect
 
 Activities are saved as rowing, with the app's own data in FIT developer fields.
 
-- **Charts**: stroke rate and distance per stroke; with Rowing Metrics Log on,
+- **Charts**: stroke rate and distance per stroke; with FIT Log set to Rowing Metrics,
   also force ratio, delta-V, drive and recovery time, catch duration and slope,
   peak, average and max acceleration
 - **Activity summary**: average and max stroke rate, total strokes, average
@@ -218,8 +243,8 @@ Activities are saved as rowing, with the app's own data in FIT developer fields.
 - **Store version only**: Garmin Connect displays developer fields only for apps
   installed from the Connect IQ Store. A sideloaded build writes the same data,
   which other tools can read (for example `tools/fit_extract.py`)
-- **One log mode per activity**, in this order of priority: HF Accel, Accel
-  Logging, Rowing Metrics Log, Radar Raw Log. Stroke rate and distance per
+- **One log mode per activity** (Recording > FIT Log): Rowing Metrics, HF
+  Accel 25 Hz, Accel 1 Hz, Radar Targets or Off. Stroke rate and distance per
   stroke are always recorded
 - **Preview without an activity upload**: export the `.iq` package and open it
   with a recorded FIT file in the SDK's Monkey Graph tool

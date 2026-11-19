@@ -1,4 +1,5 @@
 using Toybox.AntPlus;
+using Toybox.Application;
 using Toybox.System;
 using Toybox.Attention;
 using Toybox.Position;
@@ -268,14 +269,23 @@ class RadarMonitor extends AntPlus.BikeRadarListener {
             lastAlertTime = now;
         } else if (threatLevel == 0 && prevThreatLevel >= 3) {
             // Danger cleared: brief acknowledgment
-            if (Attention has :vibrate) {
+            if (alertsOn() && (Attention has :vibrate)) {
                 Attention.vibrate([new Attention.VibeProfile(30, 100)]);
             }
         }
     }
 
+    // Settings > Radar > Obstacle Alerts. Off: targets are still tracked
+    // (Radar data field, radar log) but nothing is shown on the bar or played.
+    function alertsOn() {
+        return Application.getApp().featureConfig.isEnabled(FeatureConfig.FEAT_RADAR_ALERTS);
+    }
+
     function playAlert(level) {
-        if (Attention has :playTone) {
+        if (!alertsOn()) { return; }
+        // Settings > Radar > Alert Sound: off keeps the vibration only
+        var sound = Application.getApp().featureConfig.isEnabled(FeatureConfig.FEAT_ALERT_SOUND);
+        if (sound && (Attention has :playTone)) {
             if (level >= 3) {
                 Attention.playTone(Attention.TONE_ALERT_HI);
             } else {

@@ -894,9 +894,10 @@ class RowingView extends WatchUi.View {
                         Graphics.TEXT_JUSTIFY_CENTER);
         }
 
-        // Radar threat indicator: colored bar on right edge
+        // Radar threat indicator: colored bar on right edge, unless obstacle
+        // alerts are off (the Radar data field still shows the range)
         var radar = Application.getApp().radarMonitor;
-        if (radar.threatLevel > 0) {
+        if (radar.alertsOn() && radar.threatLevel > 0) {
             var h = dc.getHeight();
             var barW = 6;
             var color;
