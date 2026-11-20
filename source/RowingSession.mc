@@ -49,6 +49,7 @@ class RowingSession {
     var rmAvgFields = null;
     var rmSums = null;
     var rmStrokeN = 0;
+    var rmCatchN = 0;         // strokes in which a catch dip was found
     var rmSecondN = 0;
     var rmLastStrokeCount = -1;
     // Radar raw log: ranges and speeds for all 8 targets + count + threat
@@ -255,6 +256,7 @@ class RowingSession {
                     rmSums[k] = 0.0;
                 }
                 rmStrokeN = 0;
+                rmCatchN = 0;
                 rmSecondN = 0;
                 rmLastStrokeCount = -1;
             } else if (app.featureConfig.isEnabled(FeatureConfig.FEAT_RADAR_LOG)) {
@@ -473,9 +475,19 @@ class RowingSession {
                          det.strokeRecovTime, det.strokeCatchDur, det.strokeCatchSlope,
                          det.strokePeak];
                 rmStrokeN++;
+                // Catch duration and slope (k = 4, 5) are averaged only over
+                // strokes in which a catch dip was found: otherwise both are 0
+                var hasCatch = (det.strokeCatchDur > 0);
+                if (hasCatch) { rmCatchN++; }
                 for (var k = 0; k < 7; k++) {
-                    rmSums[k] += v[k];
-                    rmAvgFields[k].setData(rmSums[k] / rmStrokeN);
+                    if (k == 4 || k == 5) {
+                        if (!hasCatch) { continue; }
+                        rmSums[k] += v[k];
+                        rmAvgFields[k].setData(rmSums[k] / rmCatchN);
+                    } else {
+                        rmSums[k] += v[k];
+                        rmAvgFields[k].setData(rmSums[k] / rmStrokeN);
+                    }
                 }
             }
             rmLastStrokeCount = det.strokeCount;

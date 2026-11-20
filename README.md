@@ -78,7 +78,7 @@ features specific to the sport.
 
 ### Core Rowing Metrics
 - **Split time /500m** from GPS distance (10s sliding window, proper v=dx/dt)
-- **Stroke rate (SPM)** from forward acceleration -- average of the last 3 stroke intervals, up to 50 spm, 0 after 6 s without strokes
+- **Stroke rate (SPM)** from forward acceleration -- average of the last 3 stroke intervals, from 8 to 50 spm, 0 after 6 s without strokes
 - **Heart rate** from paired ANT+ HR sensor
 - **Activity recording** as FIT SPORT_ROWING with custom fields
 

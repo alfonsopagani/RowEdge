@@ -36,9 +36,12 @@ class StrokeDetector {
     // 4 timestamps = average of the last 3 stroke intervals: follows starts
     // and rate changes within about 3 strokes.
     const SPM_WINDOW = 4;
-    // No stroke for this long: the rate drops to 0 (at least 6 s, longer
-    // only for very slow paddling)
+    // No stroke for this long: the rate drops to 0 (at least 6 s, up to 1.5
+    // stroke intervals for slow paddling)
     const STOP_MS = 6000;
+    // Strokes further apart than this (8 spm) are not rowing at a rate: the
+    // rate window starts again and no rate is shown until the next stroke
+    const GAP_MS = 7500;
     var strokeTimes = new [10];
     var strokeTimesIdx = 0;
     var strokeTimesCount = 0;
@@ -392,7 +395,12 @@ class StrokeDetector {
         // threshold, or the boat stopped). Start again from the largest swing
         // seen in the meantime.
         if (autoThreshold && now - quietSince > AUTO_RESEED_MS) {
-            effThreshold = clampThreshold(AUTO_FRACTION * quietMax);
+            // A knock (an Edge falling from its mount read 16 g) must not set
+            // the new threshold: a re-seed only ever lowers it, never above
+            // the level the recent strokes gave
+            var swing = quietMax;
+            if (peakAvg > 0 && swing > peakAvg) { swing = peakAvg; }
+            effThreshold = clampThreshold(AUTO_FRACTION * swing);
             peakAvg = 0.0;
             quietMax = 0.0;
             quietSince = now;
@@ -748,9 +756,11 @@ class StrokeDetector {
         // a new rate window. Otherwise the gap stays in the average until
         // SPM_WINDOW new strokes have pushed it out, and the rate reads 0
         // (or too low) for the first ~20 s after resuming.
+        // Same for a gap of more than 7.5 s: two strokes 14 s apart (light
+        // rowing mostly below the threshold) showed "5" for over 20 s.
         if (strokeTimesCount > 0) {
             var newestIdx = (strokeTimesIdx - 1 + strokeTimes.size()) % strokeTimes.size();
-            if (ts - strokeTimes[newestIdx] > MAX_STROKE_INTERVAL) {
+            if (ts - strokeTimes[newestIdx] > GAP_MS) {
                 strokeTimesCount = 0;
                 strokeTimesIdx = 0;
             }
@@ -778,15 +788,17 @@ class StrokeDetector {
 
         var avgInterval = span.toFloat() / (count - 1);
 
-        // Rowing stopped: no stroke for 6 s, or for twice the usual interval
-        // when paddling slower than 10 spm. The rate then reads 0 at once;
-        // until then it holds the last value. It used to blend the time
-        // since the last stroke into the average, so it slid down for up to
-        // 15 s and read low while rowing too.
+        // Rowing stopped: no stroke for 6 s, or for 1.5 intervals when
+        // paddling slower than 15 spm (at most 11 s, since intervals over
+        // 7.5 s restart the window). The rate then reads 0 at once; until
+        // then it holds the last value. It used to blend the time since the
+        // last stroke into the average, so it slid down for up to 15 s and
+        // read low while rowing too.
         var sinceLast = (now - newest).toFloat();
-        var stopMs = 2.0 * avgInterval;
+        var stopMs = 1.5 * avgInterval;
         if (stopMs < STOP_MS) { stopMs = STOP_MS; }
         if (sinceLast > stopMs) { return 0.0; }
+        if (avgInterval > GAP_MS) { return 0.0; }
 
         if (avgInterval < MIN_STROKE_INTERVAL) { return 0.0; }
         return 60000.0 / avgInterval;
