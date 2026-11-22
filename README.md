@@ -14,7 +14,11 @@ distributed under the same GPLv3 license. Source of this fork:
 
 ## Version history
 
-**1.1** (in beta)
+**1.1.4**, first public release on the Connect IQ Store
+
+Checked on the water against Forerunner watches in a double scull and an
+eight, from 14 to 36 spm: stroke counts within about 2% at full pressure.
+Very light rowing (arms only, half the crew of an eight) is partly missed.
 
 - Auto Threshold (optional, in Stroke Detection): stroke detection follows the
   strength of the rowing, so light paddling and heavy boats are still counted.
@@ -28,9 +32,14 @@ distributed under the same GPLv3 license. Source of this fork:
 - Settings grouped by category (Stroke Detection, Display, Radar, Recording),
   a single FIT Log choice instead of four toggles, and new radar options to
   turn the obstacle alerts or their tones off
+- No stroke rate shown below 8 spm, instead of a misleading low value
+- Auto Threshold not thrown off by knocks; catch averages skip strokes in
+  which no catch was found
+- HF Accel log: no samples lost when sensor batches arrive late, sequence
+  number in every record
 - Redrawn home screen, launcher icon and badge
 
-**1.0**, changes from RowEdge v0.7
+**1.0** (beta only, not published), changes from RowEdge v0.7
 
 - Garmin Connect charts and activity summary for the rowing data, with
   English and Italian labels (see [Garmin Connect](#garmin-connect))
