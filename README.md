@@ -56,25 +56,25 @@ to RemoEdge as well.
 ## Screenshots
 
 <p align="center">
-  <img src="images/screens/home.png" width="200" alt="Home screen artwork"/>
+  <img src="images/screens/home.png" width="200" alt="Home screen"/>
   <img src="images/screens/data-light.png" width="200" alt="Data screen, light theme"/>
   <img src="images/screens/data-dark.png" width="200" alt="Data screen, dark theme"/>
 </p>
 
-Edge 1050: home screen artwork, then the data screen at zoom z4 (acceleration
+Edge 1050: the home screen, then the data screen at zoom z4 (acceleration
 curve, split, heart rate, stroke rate, distance, time) in the light and dark
-themes. The green bar on the right of the dark screen is the radar warning.
+themes.
 
 <p align="center">
   <img src="images/screens/edge540-zoom-z2.png" width="160" alt="Edge 540, zoom z2"/>
   <img src="images/screens/edge540-split.png" width="160" alt="Edge 540, split as main field"/>
   <img src="images/screens/edge540-settings.png" width="160" alt="Edge 540, settings menu"/>
-  <img src="images/screens/edge540-features.png" width="160" alt="Edge 540, features menu"/>
+  <img src="images/screens/edge540-detection.png" width="160" alt="Edge 540, stroke detection menu"/>
 </p>
 
-Edge 540/840, from RowEdge and unchanged in RemoEdge: zoom z2 (two fields),
-split as the main field, the settings menu and the features menu. The data
-screens were taken in demo mode, hence the label in the corner.
+Edge 540/840: zoom z2 (two fields), split as the main field, the settings
+menu grouped by category and the Stroke Detection menu. All screens are from
+the simulator in demo mode, so the numbers are simulated.
 
 ## Why?
 
